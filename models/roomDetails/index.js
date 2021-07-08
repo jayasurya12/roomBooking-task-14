@@ -6,6 +6,10 @@ const roomschema= new mongoose.Schema({
         type:Number,
         required:true
     },
+    roomName:{
+        type:String,
+        required:true
+    },
     amenities:{
         type:String,
         required:true
@@ -16,7 +20,7 @@ const roomschema= new mongoose.Schema({
     },
     Booking:[{
         type:mongoose.Types.ObjectId,
-        ref:"bookingUser"
+        ref:"booking"
     }]},
     {timestamps:true},)
 
