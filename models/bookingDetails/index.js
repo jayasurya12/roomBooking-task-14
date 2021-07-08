@@ -23,7 +23,11 @@ const bookingSchema=new mongoose.Schema({
     },
     roomID:{
         type:mongoose.Types.ObjectId,
-        ref:"room"
+        ref:"rooms"
+    },
+    status:{
+        type:String,
+        default:"Booked"
     }
 },
 {timestamps:true})
