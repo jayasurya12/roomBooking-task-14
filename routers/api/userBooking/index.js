@@ -1,7 +1,6 @@
 const router=require("express").Router();
 const bookingModel=require("../../../models/bookingDetails");
 const roomModel=require("../../../models/roomDetails");
-const jwt=require("jsonwebtoken");
 const room = require("../../../models/roomDetails");
 
 
@@ -13,85 +12,71 @@ router.post("/bookingAdd",async(req,res)=>{
     try {
         const userBook=await bookingModel(req.body);
         const roomCheck= await roomModel.findById({_id:req.body.roomID}); 
-   
-//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        async function booking(){ 
+            const session= await bookingModel.startSession();
+            const booking=await bookingModel(req.body);
+            const bookingDetails= await booking.save({session:session});
+            const roomChecking= await roomModel
+                .findByIdAndUpdate(
+                {_id:booking.roomID},
+                {$addToSet:{Booking:bookingDetails.id}},
+                {new:true})
+                .session(session);
+            return res.json("successfull"); 
+        }
+                
+////////////////////////////------------request date and time----------------///////////////////////////////////
         let current=new Date()
         let start =new Date(`${userBook.startDate} ${userBook.startTime}`)
         let close =new Date(`${userBook.closeDate} ${userBook.closeTime}`)
         console.log(start,close);
-/////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////------------------invalid date time-----------////////////////////////////////////////////////////////////////
+       
         if(start == "Invalid Date"|| close == "Invalid Date"){
             res.json("Date not Valid")
         }
         else{
-            if(start >= current && start < close){
+            if(start > current && start < close){
                 let mi=close-start
                 let v=(mi/1000/60/60%24).toFixed(2);
                 console.log(v);
                 let price_1hr=1;
+////////////////////////////------------this is low duration replay----------------------//////////////////                
+               
                 if(price_1hr > v){
                     return res.json("Low duration put more then 1 hour")
-                }        
-                    if(roomCheck.Booking ==""){
-                        const session= await bookingModel.startSession();
-                        const booking=await bookingModel(req.body);
-                        const bookingDetails= await booking.save({session:session});
-                        const roomChecking= await roomModel
-                            .findByIdAndUpdate(
-                            {_id:booking.roomID},
-                            {$addToSet:{Booking:bookingDetails.id}},
-                            {new:true})
-                            .session(session);
-
-                        return res.json("successfull"); 
-                       
+                }   
+////////////////////////-----------find room empty or not-----------------/////////////////////                     
+                if(roomCheck.Booking.length == 0){
+                   booking();
                 }
-                if(roomCheck.Booking !=""){
-                        let userMod=await bookingModel.find({_id:roomCheck.Booking})                    
-                        let n= await userMod.find((data)=>{
-                            let stD=new Date(`${data.startDate} ${data.startTime}`)
-                            let clD=new Date(`${data.closeDate} ${data.closeTime}`)
-                            console.log(stD.valueOf());
-                            if(stD == start && close == clD && clD < startD ){
-                                 res.json("This time booked")
-                            }else{
-                                if(close < stD){
-                                    return true;
-                                }
+///////////////////////---------------room booking array not empty -------------//////////////////                
+                else {
+                    let userMod=await bookingModel.find({_id:roomCheck.Booking})
+                    let findThatDate =userMod.find((data)=>{
+                        let stD=new Date(`${data.startDate} ${data.startTime}`)
+                        let clD=new Date(`${data.closeDate} ${data.closeTime}`)
+    
+                            if(clD.valueOf() > start.valueOf() && stD.valueOf() < close.valueOf() ){
+                                return res.json(" same time and date already booked some One")                    
                             }
-                            
-                        })
-                        if(roomCheck){
-                                            
-                           res.json("this is already booked") 
-                        }else{
-                            const session=await bookingModel.startSession();
-                            const booking=await bookingModel(req.body);
-                            const bookingDetails=await booking.save({session:session});
-            
-                            const roomChecking=await roomModel
-                                .findByIdAndUpdate(
-                                {_id:bookingDetails.roomID},
-                                {$push:{Booking:bookingDetails._id}},
-                                {new:true})
-                                .session(session);  
-                                res.json("successfull")  
+                        });
+////////////////////////---------this is findThat Date and time  any booking available or not available ---------------                        
+                        if(findThatDate){
+                            return
                         }
-
-                    res.json("wait")    
+///////////////////////-----------------this not available that date and time to booking a room-------////////////////                        
+                        else{
+                            
+                            booking();////this function call is to booking a user room-----/////
+                           }
                 }         
-                    
             }
             else{
                 res.json("date Expired")
             }
         }
-        
-
-
-
-        
-
     } catch (error) {
     res.json({msg:"not access",error})
     }
@@ -102,7 +87,9 @@ router.post("/bookingAdd",async(req,res)=>{
 
 router.get("/data",async(req,res)=>{
     try {
-        const load =await bookingModel.find({}).populate("roomID");
+        const load =await bookingModel.find({})
+        .populate({path:"roomID",select:'amenities price_1hrs roomName status totalSeats -_id'})
+        .select("-_id Customer_Name startDate startTime closeDate clsoeTime")
         res.json(load)
     } catch (error) {
         res.json({msg:"error",error})
